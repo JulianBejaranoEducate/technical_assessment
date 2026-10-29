@@ -1,0 +1,5 @@
+{
+  "description": "Both scans complete but disagree on antennas (28 vs 26). Expected total: $8,680 for 12 floors.",
+  "initial": { "status": "completed", "counts": { "antennas": 28, "splitters": 6 } },
+  "verification": { "status": "completed", "counts": { "antennas": 26, "splitters": 6 } }
+}

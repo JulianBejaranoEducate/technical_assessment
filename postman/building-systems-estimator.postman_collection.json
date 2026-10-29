@@ -1,0 +1,377 @@
+{
+  "info": {
+    "name": "Building Systems Estimator",
+    "description": "Requests for the Developer Technical Assessment API. Start the server with `npm start` (http://localhost:3000), then run the requests in order, or use Run collection. Each request has tests that check the expected result.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "estimateId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Create estimate: demo (expect 201)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+              "const estimate = pm.response.json();",
+              "pm.test(\"status is completed_with_warnings\", () => pm.expect(estimate.status).to.eql(\"completed_with_warnings\"));",
+              "pm.test(\"both scans are stored\", () => {",
+              "  pm.expect(estimate.scans.initial).to.eql({ antennas: 28, splitters: 6 });",
+              "  pm.expect(estimate.scans.verification).to.eql({ antennas: 26, splitters: 6 });",
+              "});",
+              "pm.test(\"the initial counts are selected\", () => pm.expect(estimate.selected).to.eql({ antennas: 28, splitters: 6 }));",
+              "pm.test(\"line items and total are right\", () => {",
+              "  pm.expect(estimate.line_items).to.eql({ floors: 1200, antennas: 7000, splitters: 480 });",
+              "  pm.expect(estimate.total).to.eql(8680);",
+              "});",
+              "pm.test(\"the antenna mismatch is reported\", () => pm.expect(estimate.warnings).to.eql([\"Antenna count mismatch: 28 vs 26\"]));",
+              "pm.collectionVariables.set(\"estimateId\", estimate.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/estimates",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "estimates"
+          ]
+        },
+        "description": "Initial scan: 28 antennas / 6 splitters. Verification scan: 26 / 6. The initial scan wins and a warning records the antenna mismatch. Total: 12*100 + 28*250 + 6*80 = $8,680. The new id is saved in {{estimateId}} for request 2.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"project\": \"Demo Building\",\n  \"floors\": 12,\n  \"fixture\": \"demo\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "2. Get the saved estimate (expect 200)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+              "const estimate = pm.response.json();",
+              "pm.test(\"it is the estimate created in request 1\", () => pm.expect(estimate.id).to.eql(pm.collectionVariables.get(\"estimateId\")));",
+              "pm.test(\"values are the same as when it was created\", () => {",
+              "  pm.expect(estimate.total).to.eql(8680);",
+              "  pm.expect(estimate.selected).to.eql({ antennas: 28, splitters: 6 });",
+              "  pm.expect(estimate.warnings).to.eql([\"Antenna count mismatch: 28 vs 26\"]);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/estimates/{{estimateId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "estimates",
+            "{{estimateId}}"
+          ]
+        },
+        "description": "Reads back the estimate created by request 1. Run request 1 first."
+      }
+    },
+    {
+      "name": "3. Create estimate: verification_failure (expect 201)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+              "const estimate = pm.response.json();",
+              "pm.test(\"verification stage failed, consolidation completed\", () => {",
+              "  pm.expect(estimate.stages).to.eql({ initial: \"completed\", verification: \"failed\", consolidation: \"completed\" });",
+              "});",
+              "pm.test(\"verification result is null\", () => pm.expect(estimate.scans.verification).to.eql(null));",
+              "pm.test(\"initial counts are kept and priced\", () => {",
+              "  pm.expect(estimate.selected).to.eql({ antennas: 28, splitters: 6 });",
+              "  pm.expect(estimate.total).to.eql(8680);",
+              "});",
+              "pm.test(\"a failure warning is saved\", () => pm.expect(estimate.warnings).to.eql([\"Verification scan failed\"]));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/estimates",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "estimates"
+          ]
+        },
+        "description": "The verification scan fails. The estimate is still created from the initial counts, with a failed verification stage and a warning. Total stays $8,680.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"project\": \"Demo Building\",\n  \"floors\": 12,\n  \"fixture\": \"verification_failure\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "4. Create estimate: initial_failure (expect 502)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"502 Bad Gateway\", () => pm.response.to.have.status(502));",
+              "const body = pm.response.json();",
+              "pm.test(\"error code is provider_failure and names the stage\", () => {",
+              "  pm.expect(body.error.code).to.eql(\"provider_failure\");",
+              "  pm.expect(body.error.stage).to.eql(\"initial\");",
+              "});",
+              "pm.test(\"no estimate is returned\", () => pm.expect(body.id).to.eql(undefined));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/estimates",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "estimates"
+          ]
+        },
+        "description": "The initial scan fails, so no estimate can be made: 502 with a provider-failure error, nothing is saved.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"project\": \"Demo Building\",\n  \"floors\": 12,\n  \"fixture\": \"initial_failure\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "5. Invalid input: empty project and 0 floors (expect 400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+              "const body = pm.response.json();",
+              "pm.test(\"error code is validation_error\", () => pm.expect(body.error.code).to.eql(\"validation_error\"));",
+              "pm.test(\"both bad fields are reported\", () => pm.expect(body.error.details.map(d => d.field)).to.eql([\"project\", \"floors\"]));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/estimates",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "estimates"
+          ]
+        },
+        "description": "The example from the exercise statement. Validation fails before the provider is called; every problem is listed.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"project\": \"\",\n  \"floors\": 0,\n  \"fixture\": \"demo\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "6. Invalid input: floors sent as a string (expect 400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+              "const body = pm.response.json();",
+              "pm.test(\"floors is reported with a clear message\", () => {",
+              "  pm.expect(body.error.details[0].field).to.eql(\"floors\");",
+              "  pm.expect(body.error.details[0].message).to.include(\"positive integer\");",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/estimates",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "estimates"
+          ]
+        },
+        "description": "Values are not coerced: the string \"12\" is rejected, floors must be a positive integer.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"project\": \"Demo Building\",\n  \"floors\": \"12\",\n  \"fixture\": \"demo\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "7. Unknown fixture (expect 400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+              "const body = pm.response.json();",
+              "pm.test(\"error code is unknown_fixture\", () => pm.expect(body.error.code).to.eql(\"unknown_fixture\"));",
+              "pm.test(\"the message lists the available fixtures\", () => pm.expect(body.error.message).to.include(\"demo\"));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/estimates",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "estimates"
+          ]
+        },
+        "description": "A client error, not a provider failure. The message lists the available fixtures.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"project\": \"Demo Building\",\n  \"floors\": 12,\n  \"fixture\": \"nope\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "8. Get an id that does not exist (expect 404)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"404 Not Found\", () => pm.response.to.have.status(404));",
+              "pm.test(\"error code is not_found\", () => pm.expect(pm.response.json().error.code).to.eql(\"not_found\"));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/estimates/est_does_not_exist",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "estimates",
+            "est_does_not_exist"
+          ]
+        },
+        "description": "Unknown ids answer 404 in the same JSON error format."
+      }
+    }
+  ]
+}

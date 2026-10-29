@@ -1,0 +1,5 @@
+{
+  "description": "The initial scan fails, so no estimate can be created. The verification result is never reached.",
+  "initial": { "status": "failed", "error": "Simulated provider outage" },
+  "verification": { "status": "completed", "counts": { "antennas": 26, "splitters": 6 } }
+}

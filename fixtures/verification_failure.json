@@ -1,0 +1,5 @@
+{
+  "description": "The initial scan succeeds (same counts as demo) but the verification scan fails.",
+  "initial": { "status": "completed", "counts": { "antennas": 28, "splitters": 6 } },
+  "verification": { "status": "failed", "error": "Simulated provider timeout" }
+}
